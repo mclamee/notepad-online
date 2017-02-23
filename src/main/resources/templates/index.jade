@@ -1,0 +1,11 @@
+extends ./layout/layout
+
+block page_title
+  .option-panel(style='position:absolute;height:100%;width:260px')
+    div(style='position: absolute; overflow: hidden; top:100px; bottom:0')
+      div(style='width: 120%; height:100%; overflow-y: scroll')
+        include ./detail/panel.jade
+
+block body
+  .editor-panel
+    include ./detail/editor.jade
