@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class IOUtil {
 	
@@ -13,9 +15,7 @@ public class IOUtil {
         String encoding = System.getProperty("file.encoding");  
         FileInputStream fileInputStream = new FileInputStream(file);  
         FileChannel channel = fileInputStream.getChannel();  
-        System.out.println(channel.size());  
-
-        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(1024 * 1024);  
+        ByteBuffer byteBuffer = ByteBuffer.allocateDirect((int)channel.size());  
         StringBuilder sb = new StringBuilder();
         while (channel.read(byteBuffer) > 0) {  
             byteBuffer.rewind();
@@ -25,5 +25,9 @@ public class IOUtil {
         }
         fileInputStream.close();
         return sb.toString();
+    }  
+    
+    public static void saveFileNio(File file, String data) throws Exception{
+    	Files.write(Paths.get(file.toURI()), data.getBytes());
     }  
 }

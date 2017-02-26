@@ -5,35 +5,34 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.wicky.IOUtil;
-import com.wicky.domain.EmployeeVO;
-import com.wicky.service.AccountService;
 
 @Controller
 @RequestMapping("/")
 @EnableAutoConfiguration
 public class IndexController {
-	
-	@Autowired
-	private AccountService service;
-	
-	private List<String> words = new ArrayList<>();
+
+//	@Autowired
+//	private AccountService service;
+
+	private Set<String> words = new LinkedHashSet<>();
 	
 	@PostConstruct
 	public void init(){
@@ -64,7 +63,8 @@ public class IndexController {
 					String word = sb.toString();
 //					System.out.println(word);
 					if(word.length() > 3){
-						words.add(word);	
+						word = word.substring(0, 4);
+						words.add(word);
 					}
 					sb = new StringBuilder();
 					fr = false;
@@ -79,22 +79,52 @@ public class IndexController {
 	@GetMapping
 	String redirect(HttpServletRequest request){
 		int id = ThreadLocalRandom.current().nextInt(0, words.size());
-		String name = words.get(id);
+		String name = (String) words.toArray()[id];
+		int i = 1;
+		File file = findFile(name);
+		while(file.exists()){
+			file = findFile(name + i++);
+		}
+		name = file.getName();
 		return "redirect:/" + name;
 	}
 	
 	@PostMapping("{name}")
 	@ResponseBody
-	String save(@PathVariable(value="name", required=true) String name, String data, HttpServletRequest request) {
-		
+	String save(@PathVariable(value="name", required=true) String name, @RequestParam String data) {
+		File file = loadFile(name);
+		try {
+			IOUtil.saveFileNio(file, data);
+			System.out.println("saved! " + data);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
 		return "success";
 	}
 	
     @GetMapping("{name}")
-    String index(@PathVariable(value="name", required=false) String name, HttpServletRequest request) {
-    	String path = System.getProperty("store") + "/" + name;
+    String index(@PathVariable(value="name", required=false) String name, Model model) {
+        return "index";
+    }
 
-    	File file = new File(path);
+    @GetMapping(value="{name}", headers="content-type=text/plain")
+    @ResponseBody
+	String load(@PathVariable(value="name") String name) {
+		File file = loadFile(name);
+		String data = "";
+		try {
+			data = IOUtil.readFileNio(file);
+			System.out.println(data);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return data;
+	}
+
+	private File loadFile(String name) {
+		File file = findFile(name);
 		if(!file.exists()){
 			try {
 				file.createNewFile();
@@ -102,18 +132,13 @@ public class IndexController {
 				e.printStackTrace();
 			}
     	}
-    	
-		List<EmployeeVO> employees = service.getAllEmployees();
-		System.out.println(employees);
-		
-		try {
-			String data = IOUtil.readFileNio(file);
-			System.out.println(data);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-        return "index";
-    }
-    
+		return file;
+	}
+
+	private File findFile(String name) {
+		String path = System.getProperty("store") + "/" + name;
+    	File file = new File(path);
+		return file;
+	}
+
 }

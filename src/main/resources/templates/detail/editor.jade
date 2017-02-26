@@ -1,14 +1,151 @@
-#editor
-script(src='../monaco-editor/min/vs/loader.js')
-script.
-	require.config({ paths: { 'vs': '../monaco-editor/min/vs' }});
-	require(['vs/editor/editor.main'], function() {
-		var editor = monaco.editor.create(document.getElementById('editor'), {
-			value: [
-				'function x() {',
-				'\tconsole.log("Hello world!");',
-				'}'
-			].join('\n'),
-			language: 'javascript'
-		});
-	});
+.editor-frame
+  .loading
+  #editor
+script
+    var contentChanged = false;
+    (function () {// detect idle
+        var t;
+        window.onload = resetTimer;
+        // DOM Events
+        document.onmousemove = resetTimer;
+        document.onkeypress = resetTimer;
+        
+        function triggerSave() {            
+            if(contentChanged){
+                var toSave = editor.getValue();
+                console.log("Content changed and editing idled for 3 seconds, saving ...");
+                $.ajax({
+                  type: 'POST',
+                  url: window.location.pathname,
+                  dataType: 'text',
+                  data: 'data='+toSave,
+                  error: function (e) {
+                    console.log('save error!');
+                    console.log(e);
+                  }
+                }).done(function(data) {
+                    if(data == 'success'){
+                        console.log("saved success!");
+                        contentChanged = false;
+                    }
+                });
+            }
+        }
+        function resetTimer() {
+            clearTimeout(t);
+            t = setTimeout(triggerSave, 3000);
+        }
+    })();
+
+script(src='/resources/js/jquery.min.js')
+script
+  var require = { paths: { 'vs': '/resources/monaco-editor/min/vs' } };
+script(src='/resources/monaco-editor/dev/vs/loader.js')
+script
+  "use strict";
+  var editor = null;
+  
+  $(document).ready(function() {
+    require(['vs/editor/editor.main'], function () {
+      var MODES = (function() {
+        var modesIds = monaco.languages.getLanguages().map(function(lang) { return lang.id; });
+        modesIds.sort();
+  
+        return modesIds.map(function(modeId) {
+          return {
+            modeId: modeId,
+            sampleURL: window.location.pathname
+          };
+        });
+      })();
+  
+      var startModeIndex = 0;
+      for (var i = 0; i < MODES.length; i++) {
+        var o = document.createElement('option');
+        o.textContent = MODES[i].modeId;
+        if (MODES[i].modeId === 'plaintext') {
+          startModeIndex = i;
+        }
+        $(".language-picker").append(o);
+      }
+      $(".language-picker")[0].selectedIndex = startModeIndex;
+      
+      loadSample(MODES[startModeIndex]);
+      
+      $(".language-picker").change(function() {
+        loadSample(MODES[this.selectedIndex]);
+      });
+  
+      $(".theme-picker").change(function() {
+        changeTheme(this.selectedIndex);
+      });
+
+    });
+  
+    window.onresize = function () {
+      if (editor) {
+        editor.layout();
+      }
+    };
+  });
+    
+  function xhr(url, cb) {
+    $.ajax({
+      type: 'GET',
+      url: url,
+      dataType: 'text',
+      contentType: 'text/plain',
+      error: function () {
+        cb(this, null);
+      }
+    }).done(function(data) {
+      cb(null, data);
+    });
+  }
+
+  function loadSample(mode) {
+    //$('.loading.editor').show();
+    xhr(mode.sampleURL, function(err, data) {
+      console.log(data.length);
+    
+      if (err) {
+        if (editor) {
+          if (editor.getModel()) {
+            editor.getModel().dispose();
+          }
+          editor.dispose();
+          editor = null;
+        }
+        //$('.loading.editor').fadeOut({ duration: 200 });
+        $('#editor').empty();
+        $('#editor').append('<p class="alert alert-error">Failed to load ' + mode.modeId + ' sample</p>');
+        return;
+      }
+  
+      if (!editor) {
+        $('#editor').empty();
+        editor = monaco.editor.create(document.getElementById('editor'), {
+          model: null,
+        });
+        editor.addListener('contentChanged', function(x){
+            contentChanged = true;
+        });
+      }
+  
+      var oldModel = editor.getModel();
+      var newModel = monaco.editor.createModel(data, mode.modeId);
+      
+      editor.setModel(newModel);
+      if (oldModel) {
+        oldModel.dispose();
+      }
+      //$('.loading.editor').fadeOut({ duration: 300 });
+    })
+  }
+  
+  function changeTheme(theme) {
+    var newTheme = (theme === 1 ? 'vs-dark' : ( theme === 0 ? 'vs' : 'hc-black' ));
+    if (editor) {
+      editor.updateOptions({ 'theme' : newTheme });
+    }
+  }

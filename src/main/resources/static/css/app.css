@@ -30,7 +30,7 @@ body {
     right: 0px;
     background: white;
 }
-
+.editor-frame,
 #editor {
 	width: 100%;
 	height: 100%;
